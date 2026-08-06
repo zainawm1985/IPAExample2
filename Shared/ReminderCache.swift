@@ -72,4 +72,23 @@ enum ReminderCache {
             .filter { $0.enabled && $0.reminderDate >= todayEnd && $0.confirmed == false }
             .sorted { $0.reminderDate < $1.reminderDate }
     }
+
+    // MARK: - 诊断信息
+
+    /// 返回诊断字符串，用于 Widget 显示无数据原因
+    static func diagnosticInfo() -> String {
+        guard let container = containerURL else {
+            return "AppGroup=nil"
+        }
+        guard let url = fileURL else {
+            return "fileURL=nil"
+        }
+        if !FileManager.default.fileExists(atPath: url.path) {
+            return "文件不存在(\(url.lastPathComponent))"
+        }
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attrs?[.size] as? Int) ?? -1
+        let all = loadAll()
+        return "size=\(size)B items=\(all.count) enabled=\(all.filter { $0.enabled }.count)"
+    }
 }

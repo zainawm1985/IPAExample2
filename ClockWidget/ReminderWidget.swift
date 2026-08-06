@@ -4,20 +4,24 @@ import SwiftUI
 struct ReminderEntry: TimelineEntry {
     let date: Date
     let reminders: [Reminder]
+    let diagnostic: String
 }
 
 struct ReminderProvider: TimelineProvider {
     func placeholder(in context: Context) -> ReminderEntry {
-        ReminderEntry(date: Date(), reminders: [])
+        ReminderEntry(date: Date(), reminders: [], diagnostic: "")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ReminderEntry) -> Void) {
-        completion(ReminderEntry(date: Date(), reminders: ReminderCache.displayReminders()))
+        let reminders = ReminderCache.displayReminders()
+        let diag = reminders.isEmpty ? ReminderCache.diagnosticInfo() : ""
+        completion(ReminderEntry(date: Date(), reminders: reminders, diagnostic: diag))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ReminderEntry>) -> Void) {
         let reminders = ReminderCache.displayReminders()
-        let entry = ReminderEntry(date: Date(), reminders: reminders)
+        let diag = reminders.isEmpty ? ReminderCache.diagnosticInfo() : ""
+        let entry = ReminderEntry(date: Date(), reminders: reminders, diagnostic: diag)
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
         completion(Timeline(entries: [entry], policy: .after(next)))
     }
@@ -80,6 +84,12 @@ struct SmallReminderView: View {
                 Text("今日无提醒")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if !entry.diagnostic.isEmpty {
+                    Text(entry.diagnostic)
+                        .font(.system(size: 7))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
                 Spacer()
             }
         }
@@ -107,6 +117,11 @@ struct MediumReminderView: View {
                 Text("今日无提醒")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if !entry.diagnostic.isEmpty {
+                    Text(entry.diagnostic)
+                        .font(.system(size: 8))
+                        .foregroundStyle(.red)
+                }
             } else {
                 ForEach(entry.reminders.prefix(4)) { r in
                     HStack {
@@ -156,6 +171,11 @@ struct LargeReminderView: View {
                 Text("今日无提醒")
                     .font(.body)
                     .foregroundStyle(.secondary)
+                if !entry.diagnostic.isEmpty {
+                    Text(entry.diagnostic)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             } else {
                 ForEach(entry.reminders) { r in
                     HStack {
