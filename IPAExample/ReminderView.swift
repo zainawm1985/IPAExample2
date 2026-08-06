@@ -3,6 +3,7 @@ import WidgetKit
 
 struct ReminderView: View {
     @StateObject private var store = ReminderStore()
+    @State private var showDiagnostic: Bool = false
 
     var body: some View {
         NavigationView {
@@ -56,6 +57,24 @@ struct ReminderView: View {
                                 .listRowBackground(Color.clear)
                             }
                         }
+                        Section {
+                            Button {
+                                store.refresh()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("刷新小组件")
+                                }
+                            }
+                            Button {
+                                showDiagnostic = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "stethoscope")
+                                    Text("诊断信息")
+                                }
+                            }
+                        }
                     }
             }
             .navigationTitle("提醒")
@@ -77,6 +96,14 @@ struct ReminderView: View {
                 AddReminderSheet { newReminder in
                     store.add(newReminder)
                 }
+            }
+            .alert("诊断信息", isPresented: $showDiagnostic) {
+                Button("复制", role: .none) {
+                    UIPasteboard.general.string = ReminderCache.diagnosticInfo()
+                }
+                Button("好的", role: .cancel) {}
+            } message: {
+                Text(ReminderCache.diagnosticInfo())
             }
             .onAppear {
                 store.refresh()

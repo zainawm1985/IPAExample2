@@ -4,12 +4,21 @@ enum ReminderCache {
     private static let filename = "reminders.json"
     static let appGroupID = "group.com.example.IPAExample"
 
+    /// App Group 容器路径（需要合法签名+entitlements才可用，TrollStore下可能为nil）
     private static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)
     }
 
     private static var fileURL: URL? {
         containerURL?.appendingPathComponent(filename)
+    }
+
+    /// 硬编码的共享路径（TrollStore 应用以 mobile 用户运行，可访问此目录）
+    /// 作为 App Group 不可用时的保底方案，主App和Widget都尝试读写此路径
+    private static var sharedFilePath: URL? {
+        // /var/mobile/Library/Caches/ 是用户级目录，TrollStore 应用通常可访问
+        let path = "/var/mobile/Library/Caches/com.example.IPAExample.shared.json"
+        return URL(fileURLWithPath: path)
     }
 
     /// 旧格式（hour/minute）兼容结构
@@ -25,10 +34,35 @@ enum ReminderCache {
     }
 
     static func loadAll() -> [Reminder] {
-        guard let url = fileURL,
-              let data = try? Data(contentsOf: url) else {
-            return []
+        // 方案1：从 App Group 容器文件读取
+        if let url = fileURL,
+           let data = try? Data(contentsOf: url) {
+            if let reminders = decodeReminders(data) {
+                return reminders
+            }
         }
+
+        // 方案2：从硬编码共享路径读取（TrollStore 保底方案）
+        if let url = sharedFilePath,
+           let data = try? Data(contentsOf: url) {
+            if let reminders = decodeReminders(data) {
+                return reminders
+            }
+        }
+
+        // 方案3：从 UserDefaults suiteName 读取（备选）
+        if let defaults = UserDefaults(suiteName: appGroupID),
+           let data = defaults.data(forKey: "reminders_backup") {
+            if let reminders = decodeReminders(data) {
+                return reminders
+            }
+        }
+
+        return []
+    }
+
+    /// 解码提醒数据（先新格式，再旧格式迁移）
+    private static func decodeReminders(_ data: Data) -> [Reminder]? {
         // 先尝试新格式解码
         if let reminders = try? JSONDecoder().decode([Reminder].self, from: data) {
             return reminders
@@ -51,18 +85,34 @@ enum ReminderCache {
                     confirmed: old.confirmed
                 )
             }
-            // 保存迁移后的数据
             saveAll(migrated)
             return migrated
         }
-        return []
+        return nil
     }
 
     static func saveAll(_ reminders: [Reminder]) {
-        guard let container = containerURL else { return }
-        try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
-        guard let url = fileURL, let data = try? JSONEncoder().encode(reminders) else { return }
-        try? data.write(to: url, options: .atomic)
+        guard let data = try? JSONEncoder().encode(reminders) else { return }
+
+        // 方案1：写入 App Group 容器文件
+        if let container = containerURL {
+            try? FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+            if let url = fileURL {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+
+        // 方案2：写入硬编码共享路径（TrollStore 保底方案）
+        if let url = sharedFilePath {
+            let dir = url.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
+
+        // 方案3：同时写入 UserDefaults suiteName（三写提高可靠性）
+        if let defaults = UserDefaults(suiteName: appGroupID) {
+            defaults.set(data, forKey: "reminders_backup")
+        }
     }
 
     /// 获取当日事件（按时间升序）
@@ -108,5 +158,56 @@ enum ReminderCache {
         return all
             .filter { $0.enabled && $0.reminderDate >= todayEnd && $0.confirmed == false }
             .sorted { $0.reminderDate < $1.reminderDate }
+    }
+
+    /// 诊断信息（用于排查Widget读取不到数据的问题）
+    static func diagnosticInfo() -> String {
+        var lines: [String] = []
+        lines.append("AppGroup ID: \(appGroupID)")
+
+        if let container = containerURL {
+            lines.append("AppGroup容器: 可用")
+            if let url = fileURL {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                    let size = attrs?[.size] as? Int ?? 0
+                    lines.append("AppGroup文件: \(size) 字节")
+                } else {
+                    lines.append("AppGroup文件: 不存在")
+                }
+            }
+        } else {
+            lines.append("AppGroup容器: nil (不可用)")
+        }
+
+        // 检查硬编码共享路径
+        if let url = sharedFilePath {
+            if FileManager.default.fileExists(atPath: url.path) {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                let size = attrs?[.size] as? Int ?? 0
+                lines.append("共享文件: \(size) 字节")
+                if let data = try? Data(contentsOf: url) {
+                    lines.append("共享文件可读: 是 (\(data.count) 字节)")
+                }
+            } else {
+                lines.append("共享文件: 不存在")
+            }
+        }
+
+        // 也检查 UserDefaults suiteName
+        if let defaults = UserDefaults(suiteName: appGroupID) {
+            if let data = defaults.data(forKey: "reminders_backup") {
+                lines.append("UserDefaults: \(data.count) 字节")
+            } else {
+                lines.append("UserDefaults: 无")
+            }
+        } else {
+            lines.append("UserDefaults: nil")
+        }
+
+        let count = loadAll().count
+        lines.append("已加载事件: \(count) 条")
+
+        return lines.joined(separator: "\n")
     }
 }

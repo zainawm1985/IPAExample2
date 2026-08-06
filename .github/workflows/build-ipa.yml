@@ -41,7 +41,15 @@ jobs:
           echo "==> PlugIns (if any):"
           ls -la "$APP_PATH/PlugIns/" 2>&1 || echo "(no PlugIns)"
           if [ -d "$APP_PATH/PlugIns" ]; then
+            echo "==> PlugIns contents (detailed):"
             find "$APP_PATH/PlugIns" -type f | head -40
+            echo "==> appex Info.plist check:"
+            for APPEX in "$APP_PATH/PlugIns"/*.appex; do
+              if [ -d "$APPEX" ]; then
+                echo "--- $APPEX/Info.plist ---"
+                /usr/libexec/PlistBuddy -c "Print" "$APPEX/Info.plist" 2>&1 || echo "(no Info.plist)"
+              fi
+            done
           fi
 
       - name: Fakesign .app + appex (ldid)
@@ -52,6 +60,8 @@ jobs:
           # 签名主可执行文件
           ldid -Sentitlements.plist "$APP_PATH/IPAExample"
           echo "==> [OK] fakesigned main: IPAExample"
+          echo "--- Main app entitlements (embedded): ---"
+          ldid -e "$APP_PATH/IPAExample" 2>&1 || echo "(failed to dump)"
           codesign -dvv "$APP_PATH/IPAExample" 2>&1 || true
 
           # 签名所有内嵌的 app extension (Widget 等)
@@ -64,6 +74,8 @@ jobs:
                 if [ -f "$EXEC" ]; then
                   ldid -Sentitlements-widget.plist "$EXEC"
                   echo "==> [OK] fakesigned appex: $APPEX_NAME"
+                  echo "--- Widget entitlements (embedded): ---"
+                  ldid -e "$EXEC" 2>&1 || echo "(failed to dump)"
                   codesign -dvv "$EXEC" 2>&1 || true
                 else
                   echo "==> [WARN] no executable in $APPEX"
@@ -72,7 +84,7 @@ jobs:
               fi
             done
           else
-            echo "==> (no PlugIns directory to sign)"
+            echo "==> [ERROR] no PlugIns directory! Widget will not work!"
           fi
 
       - name: Package .ipa
