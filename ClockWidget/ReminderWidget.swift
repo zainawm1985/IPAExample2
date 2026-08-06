@@ -12,11 +12,11 @@ struct ReminderProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ReminderEntry) -> Void) {
-        completion(ReminderEntry(date: Date(), reminders: ReminderCache.todayReminders()))
+        completion(ReminderEntry(date: Date(), reminders: ReminderCache.displayReminders()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ReminderEntry>) -> Void) {
-        let reminders = ReminderCache.todayReminders()
+        let reminders = ReminderCache.displayReminders()
         let entry = ReminderEntry(date: Date(), reminders: reminders)
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
         completion(Timeline(entries: [entry], policy: .after(next)))

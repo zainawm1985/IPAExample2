@@ -27,16 +27,17 @@ final class NotificationManager: NSObject {
         content.categoryIdentifier = "REMINDER_CATEGORY"
         content.interruptionLevel = .timeSensitive
 
-        // 计算从现在到目标时间的秒数
         let timeInterval = reminder.reminderDate.timeIntervalSinceNow
 
         if timeInterval > 0 {
-            // 未来时间：用 UNTimeIntervalNotificationTrigger，首次在目标时间触发，之后每60秒重复
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
+            // 未来时间：用 UNCalendarNotificationTrigger 调度首次通知（对远期时间更可靠）
+            var comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.reminderDate)
+            comps.second = 0
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
             let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
             center.add(request)
 
-            // 同时调度一个重复通知，在目标时间后60秒开始，每60秒重复
+            // 重复通知：目标时间后60秒开始，每60秒重复
             let repeatContent = UNMutableNotificationContent()
             repeatContent.title = "提醒：\(reminder.title)"
             repeatContent.body = "请确认收到：\(reminder.title)"
@@ -44,16 +45,16 @@ final class NotificationManager: NSObject {
             repeatContent.userInfo = ["reminderId": reminder.id.uuidString]
             repeatContent.categoryIdentifier = "REMINDER_CATEGORY"
             repeatContent.interruptionLevel = .timeSensitive
+
             let repeatTrigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval + 60, repeats: true)
             let repeatRequest = UNNotificationRequest(identifier: repeatIdentifier(for: reminder.id), content: repeatContent, trigger: repeatTrigger)
             center.add(repeatRequest)
         } else {
-            // 已过时间：立即触发重复通知，每60秒
+            // 已过时间：立即触发 + 每60秒重复
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
             let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
             center.add(request)
 
-            // 重复通知
             let repeatContent = UNMutableNotificationContent()
             repeatContent.title = "提醒：\(reminder.title)"
             repeatContent.body = "请确认收到：\(reminder.title)"
@@ -61,6 +62,7 @@ final class NotificationManager: NSObject {
             repeatContent.userInfo = ["reminderId": reminder.id.uuidString]
             repeatContent.categoryIdentifier = "REMINDER_CATEGORY"
             repeatContent.interruptionLevel = .timeSensitive
+
             let repeatTrigger = UNTimeIntervalNotificationTrigger(timeInterval: 60, repeats: true)
             let repeatRequest = UNNotificationRequest(identifier: repeatIdentifier(for: reminder.id), content: repeatContent, trigger: repeatTrigger)
             center.add(repeatRequest)
@@ -98,6 +100,12 @@ final class NotificationManager: NSObject {
 }
 
 extension NotificationManager: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        // App 在前台时也显示通知
+        WidgetCenter.shared.reloadAllTimelines()
+        return [.banner, .sound]
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         if response.actionIdentifier == "CONFIRM_ACTION",
            let reminderIdStr = response.notification.request.content.userInfo["reminderId"] as? String,

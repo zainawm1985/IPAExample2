@@ -7,32 +7,56 @@ struct ReminderView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                if store.todayReminders.isEmpty {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "bell.slash")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text("今日无提醒")
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                } else {
                     List {
-                        ForEach(store.todayReminders) { reminder in
-                            ReminderRow(reminder: reminder) {
-                                store.confirm(reminder.id)
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    store.delete(reminder.id)
-                                } label: {
-                                    Label("删除", systemImage: "trash")
+                        if !store.todayReminders.isEmpty {
+                            Section("今日提醒（\(store.todayReminders.count)）") {
+                                ForEach(store.todayReminders) { reminder in
+                                    ReminderRow(reminder: reminder) {
+                                        store.confirm(reminder.id)
+                                    }
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            store.delete(reminder.id)
+                                        } label: {
+                                            Label("删除", systemImage: "trash")
+                                        }
+                                    }
                                 }
                             }
                         }
+                        if !store.upcomingReminders.isEmpty {
+                            Section("未来提醒（\(store.upcomingReminders.count)）") {
+                                ForEach(store.upcomingReminders) { reminder in
+                                    ReminderRow(reminder: reminder) {
+                                        store.confirm(reminder.id)
+                                    }
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            store.delete(reminder.id)
+                                        } label: {
+                                            Label("删除", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if store.todayReminders.isEmpty && store.upcomingReminders.isEmpty {
+                            Section {
+                                HStack {
+                                    Spacer()
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "bell.slash")
+                                            .font(.system(size: 36))
+                                            .foregroundStyle(.secondary)
+                                        Text("暂无提醒")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .listRowBackground(Color.clear)
+                            }
+                        }
                     }
-                }
             }
             .navigationTitle("提醒")
             .toolbar {
@@ -143,6 +167,7 @@ struct AddReminderSheet: View {
 
 final class ReminderStore: ObservableObject {
     @Published var todayReminders: [Reminder] = []
+    @Published var upcomingReminders: [Reminder] = []
     @Published var showAddSheet: Bool = false
 
     var headerText: String {
@@ -153,7 +178,8 @@ final class ReminderStore: ObservableObject {
     }
 
     func refresh() {
-        todayReminders = ReminderCache.todayReminders()
+        todayReminders = ReminderCache.displayReminders()
+        upcomingReminders = ReminderCache.upcomingReminders()
     }
 
     func add(_ reminder: Reminder) {
