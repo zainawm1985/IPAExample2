@@ -1,0 +1,93 @@
+name: Build IPA (fakesigned)
+
+# 在 GitHub 托管的 macOS runner 上构建，本地无需 macOS。
+# 产出经 ldid fakesign 的 .ipa，适配巨魔（TrollStore）安装。
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build .app (unsigned, all targets)
+        run: |
+          xcodebuild build \
+            -project IPAExample.xcodeproj \
+            -scheme IPAExample \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=""
+
+      - name: Inspect built .app (debug)
+        run: |
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/IPAExample.app"
+          echo "==> .app contents:"
+          ls -la "$APP_PATH/"
+          echo "==> PlugIns (if any):"
+          ls -la "$APP_PATH/PlugIns/" 2>&1 || echo "(no PlugIns)"
+          if [ -d "$APP_PATH/PlugIns" ]; then
+            find "$APP_PATH/PlugIns" -type f | head -40
+          fi
+
+      - name: Fakesign .app + appex (ldid)
+        run: |
+          brew install ldid
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/IPAExample.app"
+
+          # 签名主可执行文件
+          ldid -Sentitlements.plist "$APP_PATH/IPAExample"
+          echo "==> [OK] fakesigned main: IPAExample"
+          codesign -dvv "$APP_PATH/IPAExample" 2>&1 || true
+
+          # 签名所有内嵌的 app extension (Widget 等)
+          PLUGINS_DIR="$APP_PATH/PlugIns"
+          if [ -d "$PLUGINS_DIR" ]; then
+            for APPEX in "$PLUGINS_DIR"/*.appex; do
+              if [ -d "$APPEX" ]; then
+                APPEX_NAME="$(basename "$APPEX" .appex)"
+                EXEC="$APPEX/$APPEX_NAME"
+                if [ -f "$EXEC" ]; then
+                  ldid -Sentitlements-widget.plist "$EXEC"
+                  echo "==> [OK] fakesigned appex: $APPEX_NAME"
+                  codesign -dvv "$EXEC" 2>&1 || true
+                else
+                  echo "==> [WARN] no executable in $APPEX"
+                  ls -la "$APPEX/"
+                fi
+              fi
+            done
+          else
+            echo "==> (no PlugIns directory to sign)"
+          fi
+
+      - name: Package .ipa
+        run: |
+          mkdir -p build/Payload
+          cp -R build/DerivedData/Build/Products/Release-iphoneos/IPAExample.app build/Payload/
+          cd build
+          zip -qr IPAExample.ipa Payload
+          cd ..
+          echo "==> 产出："
+          ls -la build/IPAExample.ipa
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IPAExample-fakesigned-ipa
+          path: build/IPAExample.ipa
+          if-no-files-found: error

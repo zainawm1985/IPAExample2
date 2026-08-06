@@ -1,0 +1,59 @@
+name: IPAExample
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "15.0"
+  developmentLanguage: zh-Hans
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: NO
+    INFOPLIST_FILE: IPAExample/Info.plist
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+targets:
+  IPAExample:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: IPAExample
+        excludes:
+          - "Info.plist"
+          - "Assets.xcassets"
+      - path: Shared
+    resources:
+      - path: IPAExample/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.IPAExample
+        PRODUCT_NAME: IPAExample
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - target: ClockWidget
+
+  ClockWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: ClockWidget
+        excludes:
+          - "Info.plist"
+          - "Assets.xcassets"
+      - path: Shared
+    resources:
+      - path: ClockWidget/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.IPAExample.ClockWidget
+        PRODUCT_NAME: ClockWidget
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ClockWidget/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
