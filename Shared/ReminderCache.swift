@@ -12,13 +12,50 @@ enum ReminderCache {
         containerURL?.appendingPathComponent(filename)
     }
 
+    /// 旧格式（hour/minute）兼容结构
+    private struct LegacyReminder: Codable {
+        let id: UUID
+        let title: String
+        let hour: Int
+        let minute: Int
+        let enabled: Bool
+        let createdAt: Date
+        let lastTriggered: Date?
+        let confirmed: Bool
+    }
+
     static func loadAll() -> [Reminder] {
         guard let url = fileURL,
-              let data = try? Data(contentsOf: url),
-              let reminders = try? JSONDecoder().decode([Reminder].self, from: data) else {
+              let data = try? Data(contentsOf: url) else {
             return []
         }
-        return reminders
+        // 先尝试新格式解码
+        if let reminders = try? JSONDecoder().decode([Reminder].self, from: data) {
+            return reminders
+        }
+        // 新格式失败，尝试旧格式（hour/minute）并迁移
+        if let legacy = try? JSONDecoder().decode([LegacyReminder].self, from: data) {
+            let migrated: [Reminder] = legacy.map { old in
+                let cal = Calendar.current
+                var comps = cal.dateComponents([.year, .month, .day], from: old.createdAt)
+                comps.hour = old.hour
+                comps.minute = old.minute
+                let date = cal.date(from: comps) ?? old.createdAt
+                return Reminder(
+                    id: old.id,
+                    title: old.title,
+                    reminderDate: date,
+                    enabled: old.enabled,
+                    createdAt: old.createdAt,
+                    lastTriggered: old.lastTriggered,
+                    confirmed: old.confirmed
+                )
+            }
+            // 保存迁移后的数据
+            saveAll(migrated)
+            return migrated
+        }
+        return []
     }
 
     static func saveAll(_ reminders: [Reminder]) {
@@ -71,24 +108,5 @@ enum ReminderCache {
         return all
             .filter { $0.enabled && $0.reminderDate >= todayEnd && $0.confirmed == false }
             .sorted { $0.reminderDate < $1.reminderDate }
-    }
-
-    // MARK: - 诊断信息
-
-    /// 返回诊断字符串，用于 Widget 显示无数据原因
-    static func diagnosticInfo() -> String {
-        guard let container = containerURL else {
-            return "AppGroup=nil"
-        }
-        guard let url = fileURL else {
-            return "fileURL=nil"
-        }
-        if !FileManager.default.fileExists(atPath: url.path) {
-            return "文件不存在(\(url.lastPathComponent))"
-        }
-        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let size = (attrs?[.size] as? Int) ?? -1
-        let all = loadAll()
-        return "size=\(size)B items=\(all.count) enabled=\(all.filter { $0.enabled }.count)"
     }
 }

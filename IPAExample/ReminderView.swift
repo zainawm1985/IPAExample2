@@ -180,6 +180,8 @@ final class ReminderStore: ObservableObject {
     func refresh() {
         todayReminders = ReminderCache.displayReminders()
         upcomingReminders = ReminderCache.upcomingReminders()
+        // 每次打开App都触发Widget刷新
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func add(_ reminder: Reminder) {
