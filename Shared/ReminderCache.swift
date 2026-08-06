@@ -28,10 +28,14 @@ enum ReminderCache {
         try? data.write(to: url, options: .atomic)
     }
 
+    /// 获取当日事件（按时间升序）
     static func todayReminders(now: Date = Date()) -> [Reminder] {
         let all = loadAll()
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: now)
+        let todayEnd = cal.date(byAdding: .day, value: 1, to: todayStart)!
         return all
-            .filter { $0.enabled }
-            .sorted { ($0.hour * 60 + $0.minute) < ($1.hour * 60 + $1.minute) }
+            .filter { $0.enabled && $0.reminderDate >= todayStart && $0.reminderDate < todayEnd }
+            .sorted { $0.reminderDate < $1.reminderDate }
     }
 }

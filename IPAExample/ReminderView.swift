@@ -104,8 +104,7 @@ struct ReminderRow: View {
 struct AddReminderSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title: String = ""
-    @State private var hour: Int = 9
-    @State private var minute: Int = 0
+    @State private var reminderDate: Date = Date().addingTimeInterval(3600) // 默认1小时后
     @State private var enabled: Bool = true
     let onSave: (Reminder) -> Void
 
@@ -115,13 +114,9 @@ struct AddReminderSheet: View {
                 Section("事件") {
                     TextField("标题", text: $title)
                 }
-                Section("时间") {
-                    Picker("小时", selection: $hour) {
-                        ForEach(0..<24) { Text(String(format: "%02d", $0)).tag($0) }
-                    }
-                    Picker("分钟", selection: $minute) {
-                        ForEach([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], id: \.self) { Text(String(format: "%02d", $0)).tag($0) }
-                    }
+                Section("提醒时间") {
+                    DatePicker("时间", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                        .datePickerStyle(.compact)
                 }
                 Section {
                     Toggle("启用提醒", isOn: $enabled)
@@ -135,7 +130,7 @@ struct AddReminderSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        let r = Reminder(title: title.isEmpty ? "提醒" : title, hour: hour, minute: minute, enabled: enabled)
+                        let r = Reminder(title: title.isEmpty ? "提醒" : title, reminderDate: reminderDate, enabled: enabled)
                         onSave(r)
                         dismiss()
                     }
