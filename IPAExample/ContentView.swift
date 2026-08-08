@@ -11,17 +11,23 @@ struct ContentView: View {
                 }
                 .tag(0)
 
+            BillView()
+                .tabItem {
+                    Label("记账", systemImage: "note.text")
+                }
+                .tag(1)
+
             TrafficLimitView()
                 .tabItem {
                     Label("限行", systemImage: "car.2")
                 }
-                .tag(1)
+                .tag(2)
 
             InfoView()
                 .tabItem {
                     Label("关于", systemImage: "info.circle")
                 }
-                .tag(2)
+                .tag(3)
         }
     }
 }
