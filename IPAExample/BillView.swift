@@ -92,9 +92,11 @@ struct BillView: View {
                     ForEach(grouped, id: \.date) { group in
                         Section(header: Text(group.date)) {
                             ForEach(group.items) { record in
-                                BillRecordRow(record: record, remain: store.bill.remaining(after: record)) {
+                                BillRecordRow(record: record, remain: store.bill.remaining(after: record), onDelete: {
                                     store.delete(record.id)
-                                }
+                                }, onEdit: {
+                                    store.edit(record)
+                                })
                             }
                         }
                     }
@@ -123,6 +125,13 @@ struct BillView: View {
             .sheet(isPresented: $store.showBudgetSheet) {
                 SetBudgetSheet(current: store.bill.budget) { budget in
                     store.setBudget(budget)
+                }
+            }
+            .sheet(isPresented: $store.showEditSheet) {
+                if let record = store.editingRecord {
+                    EditBillSheet(record: record) { updated in
+                        store.update(updated)
+                    }
                 }
             }
             .onAppear {
@@ -171,6 +180,70 @@ struct AddBillSheet: View {
                                 title: title.trimmingCharacters(in: .whitespaces),
                                 amount: amt,
                                 date: date
+                            )
+                            onSave(r)
+                            dismiss()
+                        }
+                    }
+                    .disabled(Double(amount.replacingOccurrences(of: ",", with: ".")) ?? 0 <= 0 || title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+    }
+}
+
+// MARK: - 编辑记录 Sheet
+
+struct EditBillSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var title: String
+    @State private var amount: String
+    @State private var date: Date
+    let recordId: UUID
+    let createdAt: Date
+    let onSave: (BillRecord) -> Void
+
+    init(record: BillRecord, onSave: @escaping (BillRecord) -> Void) {
+        self.recordId = record.id
+        self.createdAt = record.createdAt
+        self.onSave = onSave
+        _title = State(initialValue: record.title)
+        _amount = State(initialValue: record.amountString)
+        _date = State(initialValue: record.date)
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("消费内容") {
+                    TextField("如：午餐、打车、购物", text: $title)
+                }
+                Section("消费金额") {
+                    TextField("0.00", text: $amount)
+                        .keyboardType(.decimalPad)
+                }
+                Section("消费时间") {
+                    DatePicker("时间", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                        .datePickerStyle(.compact)
+                }
+            }
+            .navigationTitle("编辑消费")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        let amt = Double(amount.replacingOccurrences(of: ",", with: ".")) ?? 0
+                        if amt > 0 && !title.trimmingCharacters(in: .whitespaces).isEmpty {
+                            let r = BillRecord(
+                                id: recordId,
+                                title: title.trimmingCharacters(in: .whitespaces),
+                                amount: amt,
+                                date: date,
+                                createdAt: createdAt
                             )
                             onSave(r)
                             dismiss()
@@ -256,6 +329,8 @@ final class BillStore: ObservableObject {
     @Published var bill: BillData = BillData()
     @Published var showAddSheet: Bool = false
     @Published var showBudgetSheet: Bool = false
+    @Published var showEditSheet: Bool = false
+    @Published var editingRecord: BillRecord? = nil
 
     func refresh() {
         bill = BillCache.load()
@@ -276,6 +351,16 @@ final class BillStore: ObservableObject {
         BillCache.deleteRecord(id)
         refresh()
     }
+
+    func edit(_ record: BillRecord) {
+        editingRecord = record
+        showEditSheet = true
+    }
+
+    func update(_ record: BillRecord) {
+        BillCache.updateRecord(record)
+        refresh()
+    }
 }
 
 // MARK: - 记录行视图（独立视图避免类型检查器超时）
@@ -284,6 +369,7 @@ struct BillRecordRow: View {
     let record: BillRecord
     let remain: Double
     let onDelete: () -> Void
+    let onEdit: () -> Void
 
     var body: some View {
         HStack {
@@ -305,10 +391,14 @@ struct BillRecordRow: View {
             }
         }
         .padding(.vertical, 2)
-        .swipeActions(edge: .trailing) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive, action: onDelete) {
                 Label("删除", systemImage: "trash")
             }
+            Button(action: onEdit) {
+                Label("编辑", systemImage: "pencil")
+            }
+            .tint(.orange)
         }
     }
 }

@@ -93,6 +93,15 @@ enum BillCache {
         save(bill)
     }
 
+    /// 更新一条记录
+    static func updateRecord(_ record: BillRecord) {
+        var bill = load()
+        if let idx = bill.records.firstIndex(where: { $0.id == record.id }) {
+            bill.records[idx] = record
+            save(bill)
+        }
+    }
+
     // MARK: - 诊断
 
     static func diagnosticInfo() -> String {
