@@ -92,32 +92,8 @@ struct BillView: View {
                     ForEach(grouped, id: \.date) { group in
                         Section(header: Text(group.date)) {
                             ForEach(group.items) { record in
-                                let remain = store.bill.remaining(after: record)
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(record.title)
-                                            .font(.body)
-                                        Text(record.timeString)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("-¥\(record.amountString)")
-                                            .font(.callout)
-                                            .foregroundStyle(.red)
-                                        Text("剩余 ¥\(remain, specifier: "%.0f")")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(remain >= 0 ? .secondary : .red)
-                                    }
-                                }
-                                .padding(.vertical, 2)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        store.delete(record.id)
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
+                                BillRecordRow(record: record, remain: store.bill.remaining(after: record)) {
+                                    store.delete(record.id)
                                 }
                             }
                         }
@@ -299,5 +275,40 @@ final class BillStore: ObservableObject {
     func delete(_ id: UUID) {
         BillCache.deleteRecord(id)
         refresh()
+    }
+}
+
+// MARK: - 记录行视图（独立视图避免类型检查器超时）
+
+struct BillRecordRow: View {
+    let record: BillRecord
+    let remain: Double
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.title)
+                    .font(.body)
+                Text(record.timeString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("-¥\(record.amountString)")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                Text("剩余 ¥\(remain, specifier: "%.0f")")
+                    .font(.system(size: 10))
+                    .foregroundStyle(remain >= 0 ? .secondary : .red)
+            }
+        }
+        .padding(.vertical, 2)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive, action: onDelete) {
+                Label("删除", systemImage: "trash")
+            }
+        }
     }
 }
