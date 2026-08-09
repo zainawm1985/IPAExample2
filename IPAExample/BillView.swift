@@ -301,7 +301,7 @@ struct BillRecordRow: View {
                     .foregroundStyle(.red)
                 Text("剩余 ¥\(remain, specifier: "%.0f")")
                     .font(.system(size: 10))
-                    .foregroundStyle(remain >= 0 ? .secondary : .red)
+                    .foregroundStyle(remain >= 0 ? Color.secondary : Color.red)
             }
         }
         .padding(.vertical, 2)
