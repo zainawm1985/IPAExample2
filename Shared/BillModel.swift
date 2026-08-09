@@ -69,6 +69,19 @@ struct BillData: Codable, Equatable {
         return min(totalSpent / budget, 1.0)
     }
 
+    /// 计算某条记录消费后的剩余预算（按时间升序累计）
+    func remaining(after record: BillRecord) -> Double {
+        let sorted = records.sorted { $0.date < $1.date }
+        var sum: Double = 0
+        for r in sorted {
+            sum += r.amount
+            if r.id == record.id {
+                return budget - sum
+            }
+        }
+        return budget - totalSpent
+    }
+
     /// 按日期分组的记录（按倒序，最新日期在前）
     var recordsByDate: [(date: String, items: [BillRecord])] {
         let grouped = Dictionary(grouping: records) { $0.dateOnlyString }

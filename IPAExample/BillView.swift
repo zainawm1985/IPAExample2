@@ -92,6 +92,7 @@ struct BillView: View {
                     ForEach(grouped, id: \.date) { group in
                         Section(header: Text(group.date)) {
                             ForEach(group.items) { record in
+                                let remain = store.bill.remaining(after: record)
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(record.title)
@@ -101,9 +102,14 @@ struct BillView: View {
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()
-                                    Text("-¥\(record.amountString)")
-                                        .font(.callout)
-                                        .foregroundStyle(.red)
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("-¥\(record.amountString)")
+                                            .font(.callout)
+                                            .foregroundStyle(.red)
+                                        Text("剩余 ¥\(remain, specifier: "%.0f")")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(remain >= 0 ? .secondary : .red)
+                                    }
                                 }
                                 .padding(.vertical, 2)
                                 .swipeActions(edge: .trailing) {
