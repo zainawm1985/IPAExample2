@@ -299,7 +299,7 @@ struct BillRecordRow: View {
                 Text("-¥\(record.amountString)")
                     .font(.callout)
                     .foregroundStyle(.red)
-                Text("剩余 ¥\(remain, specifier: "%.0f")")
+                Text("剩余 ¥\(remain, specifier: "%.2f")")
                     .font(.system(size: 10))
                     .foregroundStyle(remain >= 0 ? Color.secondary : Color.red)
             }
